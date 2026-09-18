@@ -38,14 +38,14 @@
       border: 2px dashed #bdc3c7; 
       border-radius: 8px; 
       background: #ecf0f1; 
-      letter-spacing: 4px; 
+      /* Removed artificial letter-spacing since we are forcing physical spaces now */
       font-weight: bold;
       text-align: center;
       text-transform: uppercase;
       transition: 0.2s;
     }
     #liveTranscript:focus { outline: none; border-color: #3498db; background: #fff; }
-    #liveTranscript::placeholder { font-size: 15px; letter-spacing: normal; font-weight: normal; color: #95a5a6; text-transform: none; }
+    #liveTranscript::placeholder { font-size: 15px; font-weight: normal; color: #95a5a6; text-transform: none; }
     
     #hintDisplay { font-size: 26px; color: #27ae60; font-weight: bold; letter-spacing: 6px; margin: 10px 0; display: none; }
     
@@ -59,7 +59,7 @@
     #ninjaScoreBadge { font-size: 12px; font-weight: bold; background: white; color: #e74c3c; border-radius: 50%; width: 18px; height: 18px; line-height: 18px; text-align: center; border: 2px solid #e74c3c; margin-top: 2px; }
     #dojoSprite { position: absolute; right: -5px; top: -16px; font-size: 26px; }
 
-    /* Compact Mobile Layout (No stretching, tightly packed) */
+    /* Compact Mobile Layout */
     @media (max-width: 600px) {
       body { background-color: white; padding: 0; }
       .card { border-radius: 0; box-shadow: none; border-top-width: 5px; padding: 10px; min-height: 100vh; display: block; }
@@ -105,8 +105,7 @@
 
       <div id="status">Sensei says listen...</div>
       
-      <!-- Added autocomplete="new-password" and autocapitalize="off" to force Android keyboards to hide the suggestion bar -->
-      <input type="text" id="liveTranscript" placeholder="Say or type letters..." autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-gramm="false" onkeypress="if(event.key === 'Enter') checkAnswer()" oninput="syncManualTyping()">
+      <input type="text" id="liveTranscript" placeholder="Say or type letters..." autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" onkeypress="if(event.key === 'Enter') checkAnswer()" oninput="syncManualTyping()">
       
       <div id="hintDisplay"></div>
       
@@ -285,7 +284,20 @@
     }
     
     function syncManualTyping() {
-      baselineText = document.getElementById('liveTranscript').value;
+      let el = document.getElementById('liveTranscript');
+      
+      // Strip all current spaces to get the raw typed characters
+      let rawText = el.value.replace(/\s+/g, '');
+      
+      // Re-inject a hard physical space between every letter
+      let spacedText = rawText.split('').join(' ').toUpperCase();
+      
+      // Update the text box instantly to trick the Android dictionary 
+      if (el.value !== spacedText) {
+        el.value = spacedText;
+      }
+      
+      baselineText = el.value;
       finalSpeech = "";
     }
     
