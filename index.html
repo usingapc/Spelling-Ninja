@@ -2,56 +2,75 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Spelling Ninja</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background-color: #2c3e50; color: #333; }
-    .card { background: white; max-width: 500px; margin: 0 auto; padding: 25px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); border-top: 5px solid #e74c3c; }
-    h1 { color: #2c3e50; margin-top: 0; }
+    body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background-color: #2c3e50; color: #333; margin: 0; }
+    .card { background: white; max-width: 500px; margin: 0 auto; padding: 25px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); border-top: 5px solid #e74c3c; box-sizing: border-box; }
+    h1 { color: #2c3e50; margin-top: 0; margin-bottom: 15px; }
     .list-container { text-align: left; max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 15px; margin: 15px 0; background: #fafafa; }
     .checkbox-item { margin: 8px 0; font-size: 18px; display: flex; align-items: center; cursor: pointer; }
     .checkbox-item input { width: 20px; height: 20px; margin-right: 12px; }
-    button { padding: 12px 24px; font-size: 18px; font-weight: bold; color: white; background-color: #34495e; border: none; border-radius: 8px; cursor: margin: 10px 5px; transition: 0.2s; }
+    button { padding: 12px 24px; font-size: 18px; font-weight: bold; color: white; background-color: #34495e; border: none; border-radius: 8px; cursor: pointer; margin: 10px 5px; transition: 0.2s; }
     button:hover { background-color: #2c3e50; }
     button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-    .btn-submit { background-color: #e74c3c; width: 100%; margin: 20px 0; font-size: 22px; padding: 15px; text-transform: uppercase; letter-spacing: 1px; display: block; }
+    
+    .btn-submit { background-color: #e74c3c; width: 100%; margin: 15px 0; font-size: 22px; padding: 15px; text-transform: uppercase; letter-spacing: 1px; display: block; box-sizing: border-box; }
     .btn-submit:hover { background-color: #c0392b; }
     .btn-secondary { background-color: #7f8c8d; }
-    .btn-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    .btn-row button { margin: 5px 0; flex: 1; min-width: 90px; font-size: 15px; padding: 10px; }
-    #status { margin-top: 15px; font-size: 20px; font-weight: bold; color: #2980b9; min-height: 28px; }
+    .btn-row { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .btn-row button { margin: 2px 0; flex: 1; min-width: 80px; font-size: 14px; padding: 10px 5px; }
     
-    /* Updated for Text Input */
+    #status { margin-top: 10px; font-size: 18px; font-weight: bold; color: #2980b9; min-height: 24px; }
+    
     #liveTranscript { 
       width: 100%; 
       box-sizing: border-box;
-      font-size: 28px; 
+      font-size: 24px; 
       color: #e67e22; 
-      margin: 15px 0; 
-      padding: 15px; 
+      margin: 10px 0; 
+      padding: 12px; 
       border: 2px dashed #bdc3c7; 
       border-radius: 8px; 
       background: #ecf0f1; 
-      letter-spacing: 4px; 
+      letter-spacing: 3px; 
       font-weight: bold;
       text-align: center;
       text-transform: uppercase;
       transition: 0.2s;
     }
     #liveTranscript:focus { outline: none; border-color: #3498db; background: #fff; }
+    #liveTranscript::placeholder { font-size: 16px; letter-spacing: normal; font-weight: normal; color: #95a5a6; }
     
-    #hintDisplay { font-size: 32px; color: #27ae60; font-weight: bold; letter-spacing: 6px; margin: 15px 0; display: none; }
+    #hintDisplay { font-size: 28px; color: #27ae60; font-weight: bold; letter-spacing: 6px; margin: 10px 0; display: none; }
     #gameArea { display: none; }
     
-    /* Ninja Progress Track Styles */
-    #scoreStats { font-size: 18px; font-weight: bold; color: #34495e; margin-bottom: 10px; background: #ecf0f1; padding: 10px; border-radius: 8px; border: 1px solid #bdc3c7;}
-    #scoreStats span { color: #e74c3c; font-size: 20px; }
-    #trackContainer { width: 100%; height: 12px; background: #bdc3c7; border-radius: 6px; position: relative; margin: 50px 0 40px 0; }
+    #scoreStats { font-size: 16px; font-weight: bold; color: #34495e; margin-bottom: 15px; background: #ecf0f1; padding: 8px; border-radius: 8px; border: 1px solid #bdc3c7;}
+    #scoreStats span { color: #e74c3c; font-size: 18px; }
+    
+    #trackContainer { width: 100%; height: 12px; background: #bdc3c7; border-radius: 6px; position: relative; margin: 35px 0 20px 0; }
     #trackFill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #e74c3c; border-radius: 6px; transition: width 0.4s ease-out; }
-    #ninjaSprite { position: absolute; left: 0%; top: -35px; transition: left 0.4s ease-out; z-index: 10; display: flex; flex-direction: column; align-items: center; }
-    .ninja-icon { font-size: 35px; line-height: 1; }
-    #ninjaScoreBadge { font-size: 14px; font-weight: bold; background: white; color: #e74c3c; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; border: 2px solid #e74c3c; margin-top: 2px; }
-    #dojoSprite { position: absolute; right: -5px; top: -25px; font-size: 35px; }
+    #ninjaSprite { position: absolute; left: 0%; top: -30px; transition: left 0.4s ease-out; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+    .ninja-icon { font-size: 30px; line-height: 1; }
+    #ninjaScoreBadge { font-size: 12px; font-weight: bold; background: white; color: #e74c3c; border-radius: 50%; width: 20px; height: 20px; line-height: 20px; text-align: center; border: 2px solid #e74c3c; margin-top: 2px; }
+    #dojoSprite { position: absolute; right: -5px; top: -20px; font-size: 30px; }
+
+    /* Mobile Ultra-Compact Mode */
+    @media (max-width: 600px) {
+      body { padding: 5px; }
+      .card { padding: 12px; border-top-width: 4px; }
+      h1 { font-size: 22px; margin-bottom: 8px; }
+      #scoreStats { padding: 5px; margin-bottom: 8px; font-size: 14px; }
+      #trackContainer { margin: 28px 0 12px 0; height: 10px; }
+      .ninja-icon { font-size: 24px; }
+      #dojoSprite { font-size: 24px; top: -16px; }
+      #ninjaSprite { top: -26px; }
+      #status { font-size: 15px; margin-top: 5px; min-height: 20px; }
+      #liveTranscript { padding: 10px; font-size: 20px; margin: 8px 0; }
+      #liveTranscript::placeholder { font-size: 14px; }
+      .btn-submit { font-size: 18px; padding: 12px; margin: 10px 0; }
+      .btn-row button { padding: 8px 4px; font-size: 13px; }
+    }
   </style>
 </head>
 <body>
@@ -65,9 +84,10 @@
     </div>
 
     <div id="gameArea">
+      <!-- Condensed score display -->
       <div id="scoreStats">
-        Points Needed to Win: <span id="pointsRemaining">0</span> <br>
-        <small style="color: #7f8c8d; font-size: 14px;">(Total Required: <span id="pointsTotal">0</span>)</small>
+        Points Needed: <span id="pointsRemaining">0</span> 
+        <small style="color: #7f8c8d; font-weight: normal; margin-left: 8px;">(Total: <span id="pointsTotal">0</span>)</small>
       </div>
 
       <div id="trackContainer">
@@ -81,8 +101,7 @@
 
       <div id="status">Sensei says listen...</div>
       
-      <!-- Transformed into a real text input field -->
-      <input type="text" id="liveTranscript" placeholder="Type or say letters..." autocomplete="off" spellcheck="false" onkeypress="if(event.key === 'Enter') checkAnswer()">
+      <input type="text" id="liveTranscript" placeholder="Say or type letters..." autocomplete="off" spellcheck="false" onkeypress="if(event.key === 'Enter') checkAnswer()">
       
       <div id="hintDisplay"></div>
       
@@ -194,17 +213,21 @@
     function toggleMic() {
       micEnabled = !micEnabled;
       const btn = document.getElementById('micToggleBtn');
+      const inputEl = document.getElementById('liveTranscript');
+      
       if (micEnabled) {
         btn.innerHTML = "🎤 Mic ON";
         btn.style.backgroundColor = "#27ae60";
+        inputEl.placeholder = "Say or type letters...";
         listenForSpelling();
       } else {
         btn.innerHTML = "🔇 Mic OFF";
         btn.style.backgroundColor = "#c0392b";
+        inputEl.placeholder = "Type letters...";
         isListening = false;
         if (recognition) recognition.stop();
-        document.getElementById('status').innerText = "⌨️ Keyboard Mode (Type answer)";
-        document.getElementById('liveTranscript').focus();
+        document.getElementById('status').innerText = "⌨️ Keyboard Mode";
+        inputEl.focus();
       }
     }
 
@@ -300,7 +323,7 @@
       if (micEnabled) {
          document.getElementById('status').innerText = "Sensei says listen...";
       } else {
-         document.getElementById('status').innerText = "⌨️ Keyboard Mode (Type answer)";
+         document.getElementById('status').innerText = "⌨️ Keyboard Mode";
       }
 
       window.speechSynthesis.cancel();
@@ -374,7 +397,6 @@
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           let rawSpeechChunk = event.results[i][0].transcript.toLowerCase().replace(/[.,?!]/g, '').trim();
           
-          // LIVE CHEAT PREVENTION (Only punishes if they SPEAK the full word)
           let spokenTokens = rawSpeechChunk.split(/\s+/);
           if (currentWord.length > 4 && spokenTokens.includes(currentWord.toLowerCase())) {
              document.getElementById('liveTranscript').value = ""; 
@@ -385,7 +407,6 @@
           if (event.results[i].isFinal) {
             let cleanedFinal = cleanLiveTranscript(rawSpeechChunk);
             if (cleanedFinal) {
-              // Append to the input box directly
               let inputEl = document.getElementById('liveTranscript');
               inputEl.value = inputEl.value ? inputEl.value + " " + cleanedFinal : cleanedFinal;
             }
@@ -419,7 +440,6 @@
       if (recognition) recognition.stop();
       clearTimeout(retryTimer);
       
-      // Pull exactly what is in the textbox (whether typed or spoken)
       let rawText = document.getElementById('liveTranscript').value;
       let cleanedSpelling = rawText.replace(/[\s\.-]/g, '').toLowerCase();
 
