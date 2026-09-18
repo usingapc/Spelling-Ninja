@@ -83,8 +83,10 @@
     let activeWords = [];
     let remainingDeck = [];
     let currentWord = "";
+    
     let recognition;
-    let finalTranscript = "";
+    let globalTranscript = ""; // Saves text when mic pauses/restarts
+    
     let retryTimer;
     let isListening = false;
     
@@ -211,7 +213,7 @@
     }
     
     function clearCurrentText() {
-      finalTranscript = "";
+      globalTranscript = ""; // Wipe persistent memory
       document.getElementById('liveTranscript').innerText = "...";
     }
 
@@ -244,7 +246,7 @@
       isListening = false;
       if (recognition) recognition.stop();
       clearTimeout(retryTimer);
-      finalTranscript = "";
+      globalTranscript = ""; // Reset memory for the new word
       
       document.getElementById('hintDisplay').style.display = "none"; 
       document.getElementById('liveTranscript').innerText = "...";
@@ -258,12 +260,13 @@
     }
     
     function cleanLiveTranscript(text) {
-      // Strip all punctuation first so the phonetic filter catches words securely
       let cleanedText = text.toLowerCase().replace(/[.,?!]/g, '');
 
       cleanedText = cleanedText.replace(/\bdouble u\b/g, 'w');
       cleanedText = cleanedText.replace(/\bdouble you\b/g, 'w');
-      cleanedText = cleanedText.replace(/\bletter \b/g, ''); // Fix for forcing single letters (e.g. "Letter Y" -> "Y")
+      
+      // Fix for forcing single letters (e.g. "Letter Y" -> "Y"). Regex updated to properly catch the space.
+      cleanedText = cleanedText.replace(/\bletter\s+/g, ''); 
 
       const phoneticFixes = {
         'hi': 'i', 'eye': 'i', 'aye': 'i',
@@ -311,27 +314,29 @@
       recognition.lang = 'en-US';
       recognition.continuous = true; 
       recognition.interimResults = true; 
+      
+      let currentSessionFinal = "";
 
       recognition.onresult = function(event) {
+        currentSessionFinal = "";
         let interimTranscript = "";
-        finalTranscript = ""; 
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+            currentSessionFinal += event.results[i][0].transcript + " ";
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            interimTranscript += event.results[i][0].transcript + " ";
           }
         }
         
-        let rawText = finalTranscript + interimTranscript;
+        // Combine the persistent memory with whatever is actively being heard right now
+        let rawText = globalTranscript + currentSessionFinal + interimTranscript;
         
-        // LIVE CHEAT PREVENTION
         let spokenTokens = rawText.toLowerCase().replace(/[.,?!]/g, '').trim().split(/\s+/);
-        // Bumping length > 4 prevents short words like "icy" from accidentally triggering a block
         if (currentWord.length > 4 && spokenTokens.includes(currentWord.toLowerCase())) {
            document.getElementById('liveTranscript').innerText = "🚫 SPELL IT OUT!";
-           finalTranscript = ""; 
+           globalTranscript = ""; 
+           currentSessionFinal = "";
         } else {
            document.getElementById('liveTranscript').innerText = cleanLiveTranscript(rawText);
         }
@@ -339,11 +344,11 @@
       
       recognition.onend = function() {
         if (isListening) {
+          // Save the finalized text from this microphone burst into memory before restarting
+          globalTranscript += currentSessionFinal;
           try {
             recognition.start();
-          } catch(err) {
-            // Ignore if already started
-          }
+          } catch(err) {}
         }
       };
 
