@@ -7,7 +7,7 @@
   <style>
     body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; background-color: #2c3e50; color: #333; }
     .card { background: white; max-width: 500px; margin: 0 auto; padding: 25px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); border-top: 5px solid #e74c3c; }
-    h1 { color: #2c3e50; }
+    h1 { color: #2c3e50; margin-top: 0; }
     .list-container { text-align: left; max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 15px; margin: 15px 0; background: #fafafa; }
     .checkbox-item { margin: 8px 0; font-size: 18px; display: flex; align-items: center; cursor: pointer; }
     .checkbox-item input { width: 20px; height: 20px; margin-right: 12px; }
@@ -17,9 +17,17 @@
     .btn-submit { background-color: #e74c3c; width: 100%; margin: 20px 0; font-size: 22px; padding: 15px; text-transform: uppercase; letter-spacing: 1px; }
     .btn-submit:hover { background-color: #c0392b; }
     .btn-secondary { background-color: #7f8c8d; }
+    .btn-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .btn-row button { margin: 5px 0; flex: 1; min-width: 100px; font-size: 15px; padding: 10px; }
     #status { margin-top: 15px; font-size: 20px; font-weight: bold; color: #2980b9; }
     #liveTranscript { font-size: 24px; color: #e67e22; min-height: 40px; margin: 15px 0; padding: 10px; border: 2px dashed #bdc3c7; border-radius: 8px; background: #ecf0f1; letter-spacing: 3px; font-weight: bold;}
+    #hintDisplay { font-size: 32px; color: #27ae60; font-weight: bold; letter-spacing: 6px; margin: 15px 0; display: none; }
     #gameArea { display: none; }
+    
+    /* Ninja Progress Track Styles */
+    #trackContainer { width: 100%; height: 10px; background: #bdc3c7; border-radius: 5px; position: relative; margin: 40px 0 30px 0; }
+    #ninjaSprite { position: absolute; left: 0%; top: -18px; font-size: 35px; transition: left 0.4s ease-out; z-index: 10; }
+    #dojoSprite { position: absolute; right: -5px; top: -18px; font-size: 35px; }
   </style>
 </head>
 <body>
@@ -35,15 +43,30 @@
 
     <!-- Practice Screen -->
     <div id="gameArea">
+      
+      <!-- Gamification Progress Track -->
+      <div id="trackContainer">
+        <div id="ninjaSprite">🥷</div>
+        <div id="dojoSprite">🏯</div>
+      </div>
+
       <div id="status">Sensei says listen...</div>
       
       <!-- Shows what the browser is hearing in real time -->
       <div id="liveTranscript">...</div>
       
+      <!-- Hidden display for the Hint -->
+      <div id="hintDisplay"></div>
+      
       <button onclick="checkAnswer()" class="btn-submit" id="submitBtn">Strike!</button>
       
-      <button onclick="repeatWord()" class="btn-secondary">🔊 Hear Again</button>
-      <button onclick="stopPractice()" class="btn-secondary" style="background-color: #95a5a6;">Leave Dojo</button>
+      <div class="btn-row">
+        <button id="hintBtn" onclick="showHint()" class="btn-secondary" style="background-color: #8e44ad; display: none;">💡 Hint</button>
+        <button id="tryAgainBtn" onclick="tryAgainManual()" class="btn-secondary" style="background-color: #3498db; display: none;">🔄 Try Again</button>
+        <button onclick="repeatWord()" class="btn-secondary">🔊 Hear Again</button>
+        <button onclick="useInSentence()" class="btn-secondary" style="background-color: #f39c12;">📖 Sentence</button>
+        <button onclick="stopPractice()" class="btn-secondary" style="background-color: #95a5a6;">Leave Dojo</button>
+      </div>
     </div>
   </div>
 
@@ -56,6 +79,14 @@
     let currentWord = "";
     let recognition;
     let finalTranscript = "";
+    let retryTimer;
+    
+    // Gamification & Turn Variables
+    let score = 0;
+    let maxScore = 1;
+    let currentWordMistakes = 0;
+    let wordPenaltyApplied = false;
+    let hintPenaltyApplied = false;
 
     // Fetch the lists directly from the Apps Script API
     fetch(API_URL)
@@ -102,12 +133,31 @@
 
       if (activeWords.length === 0) return alert("Select at least one training scroll.");
 
+      // Setup Gamification Math
+      score = 0;
+      maxScore = activeWords.length * 2;
+      updateNinjaTrack();
+
       document.getElementById('selectionArea').style.display = 'none';
       document.getElementById('gameArea').style.display = 'block';
       nextWord();
     }
+    
+    function updateNinjaTrack() {
+      // Calculates percentage, maxing out around 90% so the ninja stops on the dojo
+      let progress = (score / maxScore) * 90;
+      document.getElementById('ninjaSprite').style.left = progress + "%";
+    }
 
     function nextWord() {
+      // Reset penalties and mistakes for the new word
+      currentWordMistakes = 0;
+      wordPenaltyApplied = false;
+      hintPenaltyApplied = false;
+      document.getElementById('hintBtn').style.display = "none";
+      document.getElementById('tryAgainBtn').style.display = "none";
+      document.getElementById('hintDisplay').style.display = "none";
+
       currentWord = activeWords[Math.floor(Math.random() * activeWords.length)];
       speakAndListen();
     }
@@ -116,18 +166,83 @@
       speakAndListen();
     }
 
+    function showHint() {
+      // Only apply the hint penalty once per word, regardless of how many times they click it
+      if (!hintPenaltyApplied) {
+        score = Math.max(0, score - 1);
+        hintPenaltyApplied = true;
+        updateNinjaTrack();
+      }
+      
+      // Display the spelling
+      document.getElementById('hintDisplay').innerText = currentWord.toUpperCase();
+      document.getElementById('hintDisplay').style.display = "block";
+    }
+
+    function tryAgainManual() {
+      // Hides the hint so they have to spell from memory, and restarts listening
+      document.getElementById('hintDisplay').style.display = "none";
+      speakAndListen();
+    }
+
+    function useInSentence() {
+      if (recognition) recognition.stop();
+      clearTimeout(retryTimer);
+      document.getElementById('hintDisplay').style.display = "none";
+      document.getElementById('status').innerText = "Finding a sentence scroll...";
+
+      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${currentWord}`)
+        .then(response => response.json())
+        .then(data => {
+          let example = "";
+          try {
+            for (let i = 0; i < data[0].meanings.length; i++) {
+              for (let j = 0; j < data[0].meanings[i].definitions.length; j++) {
+                if (data[0].meanings[i].definitions[j].example) {
+                  example = data[0].meanings[i].definitions[j].example;
+                  break;
+                }
+              }
+              if (example) break;
+            }
+          } catch(e) {}
+
+          document.getElementById('status').innerText = "Sensei says listen...";
+          window.speechSynthesis.cancel();
+          
+          let sentenceText = example 
+            ? `${currentWord}. ${example}. ${currentWord}.` 
+            : `I do not have a sentence for this one. Spell ${currentWord}.`;
+
+          const utterance = new SpeechSynthesisUtterance(sentenceText);
+          utterance.onend = () => setTimeout(listenForSpelling, 500);
+          window.speechSynthesis.speak(utterance);
+        })
+        .catch(error => {
+          document.getElementById('status').innerText = "Sensei says listen...";
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(`Spell ${currentWord}.`);
+          utterance.onend = () => setTimeout(listenForSpelling, 500);
+          window.speechSynthesis.speak(utterance);
+        });
+    }
+
     function speakAndListen() {
       if (recognition) recognition.stop();
+      clearTimeout(retryTimer);
       finalTranscript = "";
+      
+      // Ensure hint is hidden anytime the ninja actively starts listening again
+      document.getElementById('hintDisplay').style.display = "none"; 
       document.getElementById('liveTranscript').innerText = "...";
       document.getElementById('status').innerText = "Sensei says listen...";
 
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance("Spell " + currentWord);
-      window.speechSynthesis.speak(utterance);
 
-      // Added a 500ms delay so Android has time to switch from speaker to microphone
+      // 500ms delay for Android hardware audio switching
       utterance.onend = () => setTimeout(listenForSpelling, 500);
+      window.speechSynthesis.speak(utterance);
     }
 
     function listenForSpelling() {
@@ -156,7 +271,6 @@
         document.getElementById('liveTranscript').innerText = (finalTranscript + interimTranscript).toUpperCase();
       };
 
-      // Removed the getUserMedia hack so Android's speech engine can use the mic
       try {
         recognition.start();
       } catch(err) {
@@ -166,23 +280,82 @@
 
     function checkAnswer() {
       if (recognition) recognition.stop();
+      clearTimeout(retryTimer);
       
       let rawText = document.getElementById('liveTranscript').innerText;
-      let cleanedSpelling = rawText.replace(/[\s\.-]/g, '').toLowerCase();
+      let cleanedText = rawText.toLowerCase();
+
+      // Handle multi-word letters first
+      cleanedText = cleanedText.replace(/\bdouble u\b/g, 'w');
+      cleanedText = cleanedText.replace(/\bdouble you\b/g, 'w');
+
+      // Phonetic Dictionary to catch common single-letter dictation mistakes
+      const phoneticFixes = {
+        'hi': 'i', 'eye': 'i', 'aye': 'i',
+        'see': 'c', 'sea': 'c',
+        'why': 'y',
+        'you': 'u', 'ewe': 'u',
+        'are': 'r', 'our': 'r',
+        'tea': 't', 'tee': 't',
+        'bee': 'b', 'be': 'b',
+        'oh': 'o', 'owe': 'o',
+        'pea': 'p',
+        'cue': 'q', 'queue': 'q',
+        'jay': 'j',
+        'kay': 'k',
+        'ex': 'x'
+      };
+
+      for (const [wrong, right] of Object.entries(phoneticFixes)) {
+        let regex = new RegExp(`\\b${wrong}\\b`, 'g');
+        cleanedText = cleanedText.replace(regex, right);
+      }
+
+      let cleanedSpelling = cleanedText.replace(/[\s\.-]/g, '');
 
       if (cleanedSpelling === currentWord.toLowerCase()) {
-        document.getElementById('status').innerText = "✅ Perfect Strike!";
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("Perfect!"));
-        setTimeout(nextWord, 1500);
+        score++;
+        updateNinjaTrack();
+        
+        if (score >= maxScore) {
+          document.getElementById('status').innerText = "🏆 You reached the Dojo! 🏆";
+          document.getElementById('liveTranscript').innerText = "YOU WIN!";
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance("Congratulations! You won!"));
+          setTimeout(stopPractice, 4000);
+        } else {
+          document.getElementById('status').innerText = "✅ Perfect Strike!";
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance("Perfect!"));
+          setTimeout(nextWord, 1500);
+        }
       } else {
+        currentWordMistakes++;
+        
+        // Only drop the player back 1 spot max for wrong attempts on this specific word
+        if (!wordPenaltyApplied) {
+          score = Math.max(0, score - 1);
+          wordPenaltyApplied = true;
+          updateNinjaTrack();
+        }
+        
         document.getElementById('status').innerText = `❌ Missed! You spelled: ${cleanedSpelling}`;
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("Try again, Ninja."));
-        setTimeout(speakAndListen, 2500);
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance("Try again."));
+        
+        // Check if they need a hint pause
+        if (currentWordMistakes >= 2) {
+          document.getElementById('hintBtn').style.display = "inline-block";
+          document.getElementById('tryAgainBtn').style.display = "inline-block";
+          // We intentionally do NOT set the retry timer here. 
+          // The app waits for them to use the hint and manually click "Try Again".
+        } else {
+          // If it's only their first mistake, auto-restart as usual
+          retryTimer = setTimeout(speakAndListen, 2500);
+        }
       }
     }
 
     function stopPractice() {
       if (recognition) recognition.stop();
+      clearTimeout(retryTimer);
       window.speechSynthesis.cancel();
       document.getElementById('gameArea').style.display = 'none';
       document.getElementById('selectionArea').style.display = 'block';
