@@ -40,22 +40,17 @@
   <div class="card" id="appCard">
     <h1>🥷 Spelling Ninja</h1>
     
-    <!-- Selection Screen -->
     <div id="selectionArea">
       <div id="listCheckboxes" class="list-container">Loading word scrolls...</div>
       <button id="startBtn" onclick="startPractice()" disabled>Enter the Dojo</button>
     </div>
 
-    <!-- Practice Screen -->
     <div id="gameArea">
-      
-      <!-- Gamification Stats -->
       <div id="scoreStats">
         Points Needed to Win: <span id="pointsRemaining">0</span> <br>
         <small style="color: #7f8c8d; font-size: 14px;">(Total Required: <span id="pointsTotal">0</span>)</small>
       </div>
 
-      <!-- Gamification Progress Track -->
       <div id="trackContainer">
         <div id="trackFill"></div>
         <div id="ninjaSprite">
@@ -66,11 +61,7 @@
       </div>
 
       <div id="status">Sensei says listen...</div>
-      
-      <!-- Shows what the browser is hearing in real time -->
       <div id="liveTranscript">...</div>
-      
-      <!-- Hidden display for the Hint -->
       <div id="hintDisplay"></div>
       
       <button onclick="checkAnswer()" class="btn-submit" id="submitBtn">Strike!</button>
@@ -86,8 +77,8 @@
   </div>
 
   <script>
-    // The Google Apps Script API URL
-    const API_URL = "https://script.google.com/macros/s/AKfycbwUf2NY_pDzEjcnIKjRjGLb55Xp9m2a5OtuOjxEFaSuA8MDHkongek2x_gP2BjbA9G7BA/exec"; 
+    // Updated Apps Script Web App Endpoint URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbw-2IckMLtFYfVC7cGHZAei98DESEcJLXVt5RquD26oJRyYcsnpFaEbFeWZBPLQGBH5dw/exec"; 
     
     let allLists = {};
     let activeWords = [];
@@ -96,14 +87,12 @@
     let finalTranscript = "";
     let retryTimer;
     
-    // Gamification & Turn Variables
     let score = 0;
     let maxScore = 1;
     let currentWordMistakes = 0;
     let wordPenaltyApplied = false;
     let hintPenaltyApplied = false;
 
-    // Fetch the lists directly from the Apps Script API
     fetch(API_URL)
       .then(response => response.json())
       .then(data => {
@@ -148,7 +137,6 @@
 
       if (activeWords.length === 0) return alert("Select at least one training scroll.");
 
-      // Setup Gamification Math
       score = 0;
       maxScore = activeWords.length * 2;
       document.getElementById('pointsTotal').innerText = maxScore;
@@ -160,18 +148,15 @@
     }
     
     function updateNinjaTrack() {
-      // Calculates percentage, maxing out around 90% so the ninja stops on the dojo
       let progress = (score / maxScore) * 90;
       document.getElementById('ninjaSprite').style.left = progress + "%";
       document.getElementById('trackFill').style.width = progress + "%";
       
-      // Update UI texts
       document.getElementById('ninjaScoreBadge').innerText = score;
       document.getElementById('pointsRemaining').innerText = Math.max(0, maxScore - score);
     }
 
     function nextWord() {
-      // Reset penalties and mistakes for the new word
       currentWordMistakes = 0;
       wordPenaltyApplied = false;
       hintPenaltyApplied = false;
@@ -188,20 +173,16 @@
     }
 
     function showHint() {
-      // Only apply the hint penalty once per word
       if (!hintPenaltyApplied) {
         score = Math.max(0, score - 1);
         hintPenaltyApplied = true;
         updateNinjaTrack();
       }
-      
-      // Display the spelling
       document.getElementById('hintDisplay').innerText = currentWord.toUpperCase();
       document.getElementById('hintDisplay').style.display = "block";
     }
 
     function tryAgainManual() {
-      // Hides the hint so they have to spell from memory, and restarts listening
       document.getElementById('hintDisplay').style.display = "none";
       speakAndListen();
     }
@@ -210,65 +191,22 @@
       if (recognition) recognition.stop();
       clearTimeout(retryTimer);
       document.getElementById('hintDisplay').style.display = "none";
-      document.getElementById('status').innerText = "Finding a sentence scroll...";
+      document.getElementById('status').innerText = "Sensei is consulting the AI scrolls...";
       window.speechSynthesis.cancel();
 
-      // encodeURIComponent handles spaces or special characters in the word safely
-      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(currentWord)}`)
-        .then(response => {
-          if (!response.ok) throw new Error("Word not found in API");
-          return response.json();
-        })
-        .then(data => {
-          let example = "";
-          let definition = "";
-          
-          try {
-            // Check all meanings and definitions to find the best match
-            for (let i = 0; i < data[0].meanings.length; i++) {
-              for (let j = 0; j < data[0].meanings[i].definitions.length; j++) {
-                let defObj = data[0].meanings[i].definitions[j];
-                
-                // Save the first definition we find as a fallback
-                if (!definition && defObj.definition) {
-                  definition = defObj.definition;
-                }
-                // Save the example if it exists
-                if (defObj.example) {
-                  example = defObj.example;
-                  break;
-                }
-              }
-              if (example) break;
-            }
-          } catch(e) {}
-
+      // Clean string concatenation to prevent URL parameter encoding errors
+      fetch(API_URL + "?word=" + encodeURIComponent(currentWord))
+        .then(response => response.text())
+        .then(sentence => {
           document.getElementById('status').innerText = "Sensei says listen...";
-          
-          let sentenceText = "";
-          
-          // 1st choice: Example sentence
-          if (example) {
-            // Strip out any HTML tags the API might occasionally return
-            example = example.replace(/(<([^>]+)>)/gi, "");
-            sentenceText = `${currentWord}. ${example}. ${currentWord}.`;
-          } 
-          // 2nd choice: Definition 
-          else if (definition) {
-            sentenceText = `${currentWord}. It means: ${definition}. ${currentWord}.`;
-          } 
-          // 3rd choice: Fallback
-          else {
-            sentenceText = `I do not have a sentence for this one. Spell ${currentWord}.`;
-          }
-
+          let sentenceText = `${currentWord}. ${sentence} ${currentWord}.`;
           const utterance = new SpeechSynthesisUtterance(sentenceText);
           utterance.onend = () => setTimeout(listenForSpelling, 500);
           window.speechSynthesis.speak(utterance);
         })
         .catch(error => {
           document.getElementById('status').innerText = "Sensei says listen...";
-          const utterance = new SpeechSynthesisUtterance(`I do not have a sentence for this one. Spell ${currentWord}.`);
+          const utterance = new SpeechSynthesisUtterance(`Spell ${currentWord}.`);
           utterance.onend = () => setTimeout(listenForSpelling, 500);
           window.speechSynthesis.speak(utterance);
         });
@@ -279,7 +217,6 @@
       clearTimeout(retryTimer);
       finalTranscript = "";
       
-      // Ensure hint is hidden anytime the ninja actively starts listening again
       document.getElementById('hintDisplay').style.display = "none"; 
       document.getElementById('liveTranscript').innerText = "...";
       document.getElementById('status').innerText = "Sensei says listen...";
@@ -287,7 +224,6 @@
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance("Spell " + currentWord);
 
-      // 500ms delay for Android hardware audio switching
       utterance.onend = () => setTimeout(listenForSpelling, 500);
       window.speechSynthesis.speak(utterance);
     }
@@ -332,11 +268,9 @@
       let rawText = document.getElementById('liveTranscript').innerText;
       let cleanedText = rawText.toLowerCase();
 
-      // Handle multi-word letters first
       cleanedText = cleanedText.replace(/\bdouble u\b/g, 'w');
       cleanedText = cleanedText.replace(/\bdouble you\b/g, 'w');
 
-      // Phonetic Dictionary to catch common single-letter dictation mistakes
       const phoneticFixes = {
         'hi': 'i', 'eye': 'i', 'aye': 'i',
         'see': 'c', 'sea': 'c',
@@ -377,7 +311,6 @@
       } else {
         currentWordMistakes++;
         
-        // Only drop the player back 1 spot max for wrong attempts on this specific word
         if (!wordPenaltyApplied) {
           score = Math.max(0, score - 1);
           wordPenaltyApplied = true;
@@ -387,11 +320,9 @@
         document.getElementById('status').innerText = `❌ Missed! You spelled: ${cleanedSpelling}`;
         window.speechSynthesis.speak(new SpeechSynthesisUtterance("Try again."));
         
-        // Check if they need a hint pause
         if (currentWordMistakes >= 2) {
           document.getElementById('hintBtn').style.display = "inline-block";
           document.getElementById('tryAgainBtn').style.display = "inline-block";
-          // We intentionally do NOT set the retry timer here so they have time to use the hint
         } else {
           retryTimer = setTimeout(speakAndListen, 2500);
         }
