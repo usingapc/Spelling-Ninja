@@ -77,7 +77,6 @@
   </div>
 
   <script>
-    // Updated Apps Script Web App Endpoint URL
     const API_URL = "https://script.google.com/macros/s/AKfycbw-2IckMLtFYfVC7cGHZAei98DESEcJLXVt5RquD26oJRyYcsnpFaEbFeWZBPLQGBH5dw/exec"; 
     
     let allLists = {};
@@ -146,7 +145,7 @@
 
       if (activeWords.length === 0) return alert("Select at least one training scroll.");
 
-      remainingDeck = []; // Reset the deck
+      remainingDeck = []; 
       score = 0;
       maxScore = activeWords.length * 2;
       document.getElementById('pointsTotal').innerText = maxScore;
@@ -175,12 +174,10 @@
       document.getElementById('hintDisplay').style.display = "none";
       document.getElementById('submitBtn').style.display = "block"; 
 
-      // If the deck is empty, copy the active words and shuffle them
       if (remainingDeck.length === 0) {
         remainingDeck = [...activeWords];
         shuffleArray(remainingDeck);
         
-        // Prevent the same word from appearing twice in a row when the deck resets
         if (remainingDeck.length > 1 && remainingDeck[0] === currentWord) {
           let temp = remainingDeck[0];
           remainingDeck[0] = remainingDeck[1];
@@ -188,7 +185,6 @@
         }
       }
 
-      // Draw the top card from the deck
       currentWord = remainingDeck.shift();
       speakAndListen();
     }
@@ -205,12 +201,12 @@
       }
       document.getElementById('hintDisplay').innerText = currentWord.toUpperCase();
       document.getElementById('hintDisplay').style.display = "block";
-      document.getElementById('submitBtn').style.display = "none"; // Hide strike button
+      document.getElementById('submitBtn').style.display = "none"; 
     }
 
     function tryAgainManual() {
       document.getElementById('hintDisplay').style.display = "none";
-      document.getElementById('submitBtn').style.display = "block"; // Show strike button
+      document.getElementById('submitBtn').style.display = "block"; 
       speakAndListen();
     }
     
@@ -262,15 +258,17 @@
     }
     
     function cleanLiveTranscript(text) {
-      let cleanedText = text.toLowerCase();
+      // Strip all punctuation first so the phonetic filter catches words securely
+      let cleanedText = text.toLowerCase().replace(/[.,?!]/g, '');
 
       cleanedText = cleanedText.replace(/\bdouble u\b/g, 'w');
       cleanedText = cleanedText.replace(/\bdouble you\b/g, 'w');
+      cleanedText = cleanedText.replace(/\bletter \b/g, ''); // Fix for forcing single letters (e.g. "Letter Y" -> "Y")
 
       const phoneticFixes = {
         'hi': 'i', 'eye': 'i', 'aye': 'i',
         'see': 'c', 'sea': 'c', 'si': 'c',
-        'why': 'y',
+        'why': 'y', 'wide': 'y', 'wife': 'y',
         'you': 'u', 'ewe': 'u',
         'are': 'r', 'our': 'r',
         'tea': 't', 'tee': 't',
@@ -279,8 +277,19 @@
         'pea': 'p', 'pee': 'p',
         'cue': 'q', 'queue': 'q',
         'jay': 'j',
-        'kay': 'k',
-        'ex': 'x'
+        'kay': 'k', 'okay': 'k',
+        'ex': 'x',
+        'em': 'm',
+        'en': 'n', 'in': 'n',
+        'el': 'l',
+        'es': 's', 'is': 's',
+        'ar': 'r',
+        'gee': 'g',
+        'aitch': 'h',
+        'eff': 'f',
+        'dee': 'd',
+        'vee': 'v',
+        'zee': 'z', 'zed': 'z'
       };
 
       for (const [wrong, right] of Object.entries(phoneticFixes)) {
@@ -293,7 +302,7 @@
 
     function listenForSpelling() {
       isListening = true;
-      document.getElementById('status').innerText = "🎤 Sensei is listening... (Take your time)";
+      document.getElementById('status').innerText = "🎤 Sensei is listening... (Tip: Say 'Letter Y' if stuck)";
       
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) return alert("Please use Google Chrome.");
@@ -318,18 +327,16 @@
         let rawText = finalTranscript + interimTranscript;
         
         // LIVE CHEAT PREVENTION
-        // Analyze the words as they are spoken. If the raw string contains the target word fully formed,
-        // it means they said the word instead of spelling it. 
-        let spokenTokens = rawText.toLowerCase().trim().split(/\s+/);
-        if (currentWord.length > 2 && spokenTokens.includes(currentWord.toLowerCase())) {
+        let spokenTokens = rawText.toLowerCase().replace(/[.,?!]/g, '').trim().split(/\s+/);
+        // Bumping length > 4 prevents short words like "icy" from accidentally triggering a block
+        if (currentWord.length > 4 && spokenTokens.includes(currentWord.toLowerCase())) {
            document.getElementById('liveTranscript').innerText = "🚫 SPELL IT OUT!";
-           finalTranscript = ""; // Wipe it so they can't submit it
+           finalTranscript = ""; 
         } else {
            document.getElementById('liveTranscript').innerText = cleanLiveTranscript(rawText);
         }
       };
       
-      // Prevent Android from aggressively timing out the microphone
       recognition.onend = function() {
         if (isListening) {
           try {
@@ -354,8 +361,7 @@
       
       let rawText = document.getElementById('liveTranscript').innerText.toLowerCase();
       
-      // Final cheat check just in case it slipped past the live filter
-      if (rawText.trim() === currentWord.toLowerCase() && currentWord.length > 2) {
+      if (currentWord.length > 4 && rawText.trim() === currentWord.toLowerCase()) {
         document.getElementById('status').innerText = "⚠️ Sensei says: Please spell it letter by letter!";
         window.speechSynthesis.speak(new SpeechSynthesisUtterance("Please spell the word letter by letter."));
         clearCurrentText();
@@ -373,7 +379,7 @@
           document.getElementById('status').innerText = "🏆 You reached the Dojo! 🏆";
           document.getElementById('liveTranscript').innerText = "YOU WIN!";
           window.speechSynthesis.speak(new SpeechSynthesisUtterance("Congratulations! You won!"));
-          setTimeout(function() { location.reload(); }, 4000); // Reload to exit
+          setTimeout(function() { location.reload(); }, 4000); 
         } else {
           document.getElementById('status').innerText = "✅ Perfect Strike!";
           window.speechSynthesis.speak(new SpeechSynthesisUtterance("Perfect!"));
