@@ -14,7 +14,7 @@
     button { padding: 12px 24px; font-size: 18px; font-weight: bold; color: white; background-color: #34495e; border: none; border-radius: 8px; cursor: pointer; margin: 10px 5px; transition: 0.2s; }
     button:hover { background-color: #2c3e50; }
     button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-    .btn-submit { background-color: #e74c3c; width: 100%; margin: 20px 0; font-size: 22px; padding: 15px; text-transform: uppercase; letter-spacing: 1px; }
+    .btn-submit { background-color: #e74c3c; width: 100%; margin: 20px 0; font-size: 22px; padding: 15px; text-transform: uppercase; letter-spacing: 1px; display: block; }
     .btn-submit:hover { background-color: #c0392b; }
     .btn-secondary { background-color: #7f8c8d; }
     .btn-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
@@ -82,6 +82,7 @@
     
     let allLists = {};
     let activeWords = [];
+    let remainingDeck = [];
     let currentWord = "";
     let recognition;
     let finalTranscript = "";
@@ -128,6 +129,13 @@
       const checked = document.querySelectorAll('#listCheckboxes input[type="checkbox"]:checked');
       document.getElementById('startBtn').disabled = checked.length === 0;
     }
+    
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
 
     function startPractice() {
       const checkedBoxes = document.querySelectorAll('#listCheckboxes input[type="checkbox"]:checked');
@@ -138,6 +146,7 @@
 
       if (activeWords.length === 0) return alert("Select at least one training scroll.");
 
+      remainingDeck = []; // Reset the deck
       score = 0;
       maxScore = activeWords.length * 2;
       document.getElementById('pointsTotal').innerText = maxScore;
@@ -164,8 +173,23 @@
       document.getElementById('hintBtn').style.display = "none";
       document.getElementById('tryAgainBtn').style.display = "none";
       document.getElementById('hintDisplay').style.display = "none";
+      document.getElementById('submitBtn').style.display = "block"; 
 
-      currentWord = activeWords[Math.floor(Math.random() * activeWords.length)];
+      // If the deck is empty, copy the active words and shuffle them
+      if (remainingDeck.length === 0) {
+        remainingDeck = [...activeWords];
+        shuffleArray(remainingDeck);
+        
+        // Prevent the same word from appearing twice in a row when the deck resets
+        if (remainingDeck.length > 1 && remainingDeck[0] === currentWord) {
+          let temp = remainingDeck[0];
+          remainingDeck[0] = remainingDeck[1];
+          remainingDeck[1] = temp;
+        }
+      }
+
+      // Draw the top card from the deck
+      currentWord = remainingDeck.shift();
       speakAndListen();
     }
 
@@ -181,10 +205,12 @@
       }
       document.getElementById('hintDisplay').innerText = currentWord.toUpperCase();
       document.getElementById('hintDisplay').style.display = "block";
+      document.getElementById('submitBtn').style.display = "none"; // Hide strike button
     }
 
     function tryAgainManual() {
       document.getElementById('hintDisplay').style.display = "none";
+      document.getElementById('submitBtn').style.display = "block"; // Show strike button
       speakAndListen();
     }
     
@@ -235,7 +261,6 @@
       window.speechSynthesis.speak(utterance);
     }
     
-    // Live phonetic filter to make sure "I C Y" shows up correctly instead of "EYE SEE WHY"
     function cleanLiveTranscript(text) {
       let cleanedText = text.toLowerCase();
 
@@ -291,7 +316,17 @@
         }
         
         let rawText = finalTranscript + interimTranscript;
-        document.getElementById('liveTranscript').innerText = cleanLiveTranscript(rawText);
+        
+        // LIVE CHEAT PREVENTION
+        // Analyze the words as they are spoken. If the raw string contains the target word fully formed,
+        // it means they said the word instead of spelling it. 
+        let spokenTokens = rawText.toLowerCase().trim().split(/\s+/);
+        if (currentWord.length > 2 && spokenTokens.includes(currentWord.toLowerCase())) {
+           document.getElementById('liveTranscript').innerText = "🚫 SPELL IT OUT!";
+           finalTranscript = ""; // Wipe it so they can't submit it
+        } else {
+           document.getElementById('liveTranscript').innerText = cleanLiveTranscript(rawText);
+        }
       };
       
       // Prevent Android from aggressively timing out the microphone
@@ -319,8 +354,7 @@
       
       let rawText = document.getElementById('liveTranscript').innerText.toLowerCase();
       
-      // CHEAT DETECTION: If they just say the word without spelling it
-      // Example: saying "ninja" instead of "n i n j a".
+      // Final cheat check just in case it slipped past the live filter
       if (rawText.trim() === currentWord.toLowerCase() && currentWord.length > 2) {
         document.getElementById('status').innerText = "⚠️ Sensei says: Please spell it letter by letter!";
         window.speechSynthesis.speak(new SpeechSynthesisUtterance("Please spell the word letter by letter."));
