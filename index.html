@@ -213,18 +213,29 @@
       document.getElementById('status').innerText = "Finding a sentence scroll...";
       window.speechSynthesis.cancel();
 
-      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${currentWord}`)
+      // encodeURIComponent handles spaces or special characters in the word safely
+      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(currentWord)}`)
         .then(response => {
           if (!response.ok) throw new Error("Word not found in API");
           return response.json();
         })
         .then(data => {
           let example = "";
+          let definition = "";
+          
           try {
+            // Check all meanings and definitions to find the best match
             for (let i = 0; i < data[0].meanings.length; i++) {
               for (let j = 0; j < data[0].meanings[i].definitions.length; j++) {
-                if (data[0].meanings[i].definitions[j].example) {
-                  example = data[0].meanings[i].definitions[j].example;
+                let defObj = data[0].meanings[i].definitions[j];
+                
+                // Save the first definition we find as a fallback
+                if (!definition && defObj.definition) {
+                  definition = defObj.definition;
+                }
+                // Save the example if it exists
+                if (defObj.example) {
+                  example = defObj.example;
                   break;
                 }
               }
@@ -234,9 +245,22 @@
 
           document.getElementById('status').innerText = "Sensei says listen...";
           
-          let sentenceText = example 
-            ? `${currentWord}. ${example}. ${currentWord}.` 
-            : `I do not have a sentence for this one. Spell ${currentWord}.`;
+          let sentenceText = "";
+          
+          // 1st choice: Example sentence
+          if (example) {
+            // Strip out any HTML tags the API might occasionally return
+            example = example.replace(/(<([^>]+)>)/gi, "");
+            sentenceText = `${currentWord}. ${example}. ${currentWord}.`;
+          } 
+          // 2nd choice: Definition 
+          else if (definition) {
+            sentenceText = `${currentWord}. It means: ${definition}. ${currentWord}.`;
+          } 
+          // 3rd choice: Fallback
+          else {
+            sentenceText = `I do not have a sentence for this one. Spell ${currentWord}.`;
+          }
 
           const utterance = new SpeechSynthesisUtterance(sentenceText);
           utterance.onend = () => setTimeout(listenForSpelling, 500);
