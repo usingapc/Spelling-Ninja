@@ -85,7 +85,7 @@
     let currentWord = "";
     
     let recognition;
-    let globalTranscript = ""; // Saves text when mic pauses/restarts
+    let globalTranscript = ""; // Locked-in permanent memory for letters
     
     let retryTimer;
     let isListening = false;
@@ -213,7 +213,7 @@
     }
     
     function clearCurrentText() {
-      globalTranscript = ""; // Wipe persistent memory
+      globalTranscript = ""; // Wipe locked-in memory
       document.getElementById('liveTranscript').innerText = "...";
     }
 
@@ -246,7 +246,7 @@
       isListening = false;
       if (recognition) recognition.stop();
       clearTimeout(retryTimer);
-      globalTranscript = ""; // Reset memory for the new word
+      globalTranscript = ""; 
       
       document.getElementById('hintDisplay').style.display = "none"; 
       document.getElementById('liveTranscript').innerText = "...";
@@ -262,18 +262,18 @@
     function cleanLiveTranscript(text) {
       let cleanedText = text.toLowerCase().replace(/[.,?!]/g, '');
 
+      // Universally strip the words "letter" or "letters" anywhere they appear
+      cleanedText = cleanedText.replace(/\bletters?\b/g, ''); 
+
       cleanedText = cleanedText.replace(/\bdouble u\b/g, 'w');
       cleanedText = cleanedText.replace(/\bdouble you\b/g, 'w');
-      
-      // Fix for forcing single letters (e.g. "Letter Y" -> "Y"). Regex updated to properly catch the space.
-      cleanedText = cleanedText.replace(/\bletter\s+/g, ''); 
 
       const phoneticFixes = {
         'hi': 'i', 'eye': 'i', 'aye': 'i',
         'see': 'c', 'sea': 'c', 'si': 'c',
-        'why': 'y', 'wide': 'y', 'wife': 'y',
+        'why': 'y', 'wide': 'y', 'wife': 'y', 'white': 'y',
         'you': 'u', 'ewe': 'u',
-        'are': 'r', 'our': 'r',
+        'are': 'r', 'our': 'r', 'hour': 'r',
         'tea': 't', 'tee': 't',
         'bee': 'b', 'be': 'b',
         'oh': 'o', 'owe': 'o',
@@ -281,11 +281,11 @@
         'cue': 'q', 'queue': 'q',
         'jay': 'j',
         'kay': 'k', 'okay': 'k',
-        'ex': 'x',
+        'ex': 'x', 'eggs': 'x',
         'em': 'm',
-        'en': 'n', 'in': 'n',
-        'el': 'l',
-        'es': 's', 'is': 's',
+        'en': 'n', 'in': 'n', 'an': 'n',
+        'el': 'l', 'ill': 'l',
+        'es': 's', 'is': 's', 'yes': 's',
         'ar': 'r',
         'gee': 'g',
         'aitch': 'h',
@@ -300,7 +300,8 @@
         cleanedText = cleanedText.replace(regex, right);
       }
 
-      return cleanedText.toUpperCase();
+      // Format neatly with consistent spaces
+      return cleanedText.toUpperCase().replace(/\s+/g, ' ').trim();
     }
 
     function listenForSpelling() {
@@ -314,38 +315,35 @@
       recognition.lang = 'en-US';
       recognition.continuous = true; 
       recognition.interimResults = true; 
-      
-      let currentSessionFinal = "";
 
       recognition.onresult = function(event) {
-        currentSessionFinal = "";
         let interimTranscript = "";
 
+        // Iterate through new results. If final, lock it into globalTranscript forever.
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            currentSessionFinal += event.results[i][0].transcript + " ";
+            globalTranscript += event.results[i][0].transcript + " ";
           } else {
             interimTranscript += event.results[i][0].transcript + " ";
           }
         }
         
-        // Combine the persistent memory with whatever is actively being heard right now
-        let rawText = globalTranscript + currentSessionFinal + interimTranscript;
+        // Combine permanent memory with any live partial text
+        let rawText = globalTranscript + interimTranscript;
         
+        // LIVE CHEAT PREVENTION
         let spokenTokens = rawText.toLowerCase().replace(/[.,?!]/g, '').trim().split(/\s+/);
         if (currentWord.length > 4 && spokenTokens.includes(currentWord.toLowerCase())) {
            document.getElementById('liveTranscript').innerText = "🚫 SPELL IT OUT!";
-           globalTranscript = ""; 
-           currentSessionFinal = "";
+           globalTranscript = ""; // Punish cheat by wiping memory
         } else {
            document.getElementById('liveTranscript').innerText = cleanLiveTranscript(rawText);
         }
       };
       
+      // Auto-restart without destroying locked-in memory
       recognition.onend = function() {
         if (isListening) {
-          // Save the finalized text from this microphone burst into memory before restarting
-          globalTranscript += currentSessionFinal;
           try {
             recognition.start();
           } catch(err) {}
@@ -354,9 +352,7 @@
 
       try {
         recognition.start();
-      } catch(err) {
-        console.error("Microphone start error:", err);
-      }
+      } catch(err) {}
     }
 
     function checkAnswer() {
