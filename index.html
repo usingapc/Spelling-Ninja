@@ -126,14 +126,15 @@
       const utterance = new SpeechSynthesisUtterance("Spell " + currentWord);
       window.speechSynthesis.speak(utterance);
 
-      utterance.onend = () => listenForSpelling();
+      // Added a 500ms delay so Android has time to switch from speaker to microphone
+      utterance.onend = () => setTimeout(listenForSpelling, 500);
     }
 
     function listenForSpelling() {
-      document.getElementById('status').innerText = "🎤 Requesting microphone...";
+      document.getElementById('status').innerText = "🎤 Sensei is listening... (Take your time)";
       
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) return alert("Please use Google Chrome or Edge.");
+      if (!SpeechRecognition) return alert("Please use Google Chrome.");
 
       recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
@@ -155,15 +156,12 @@
         document.getElementById('liveTranscript').innerText = (finalTranscript + interimTranscript).toUpperCase();
       };
 
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(function(stream) {
-          document.getElementById('status').innerText = "🎤 Sensei is listening... (Take your time)";
-          recognition.start();
-        })
-        .catch(function(err) {
-          document.getElementById('status').innerText = "❌ Microphone blocked.";
-          alert("Microphone access was denied. Please check your browser settings.");
-        });
+      // Removed the getUserMedia hack so Android's speech engine can use the mic
+      try {
+        recognition.start();
+      } catch(err) {
+        console.error("Microphone start error:", err);
+      }
     }
 
     function checkAnswer() {
