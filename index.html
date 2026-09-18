@@ -38,7 +38,6 @@
       border: 2px dashed #bdc3c7; 
       border-radius: 8px; 
       background: #ecf0f1; 
-      /* Removed artificial letter-spacing since we are forcing physical spaces now */
       font-weight: bold;
       text-align: center;
       text-transform: uppercase;
@@ -59,7 +58,6 @@
     #ninjaScoreBadge { font-size: 12px; font-weight: bold; background: white; color: #e74c3c; border-radius: 50%; width: 18px; height: 18px; line-height: 18px; text-align: center; border: 2px solid #e74c3c; margin-top: 2px; }
     #dojoSprite { position: absolute; right: -5px; top: -16px; font-size: 26px; }
 
-    /* Compact Mobile Layout */
     @media (max-width: 600px) {
       body { background-color: white; padding: 0; }
       .card { border-radius: 0; box-shadow: none; border-top-width: 5px; padding: 10px; min-height: 100vh; display: block; }
@@ -137,7 +135,6 @@
     let micEnabled = true;
     
     let baselineText = "";
-    let finalSpeech = "";
     
     let retryTimer;
     let score = 0;
@@ -285,26 +282,17 @@
     
     function syncManualTyping() {
       let el = document.getElementById('liveTranscript');
-      
-      // Strip all current spaces to get the raw typed characters
       let rawText = el.value.replace(/\s+/g, '');
-      
-      // Re-inject a hard physical space between every letter
       let spacedText = rawText.split('').join(' ').toUpperCase();
-      
-      // Update the text box instantly to trick the Android dictionary 
       if (el.value !== spacedText) {
         el.value = spacedText;
       }
-      
       baselineText = el.value;
-      finalSpeech = "";
     }
     
     function clearCurrentText() {
       document.getElementById('liveTranscript').value = "";
       baselineText = "";
-      finalSpeech = "";
       document.getElementById('liveTranscript').focus();
     }
 
@@ -347,7 +335,6 @@
       document.getElementById('hintDisplay').style.display = "none"; 
       document.getElementById('liveTranscript').value = "";
       baselineText = "";
-      finalSpeech = "";
       
       if (micEnabled) {
          document.getElementById('status').innerText = "Sensei says listen...";
@@ -404,7 +391,8 @@
         cleanedText = cleanedText.replace(regex, right);
       }
 
-      return cleanedText.toUpperCase().replace(/\s+/g, ' ').trim();
+      // Strips ALL spaces out completely so we can physically force single-spacing later
+      return cleanedText.toUpperCase().replace(/\s+/g, '').trim();
     }
 
     function listenForSpelling() {
@@ -422,43 +410,36 @@
 
       recognition.onstart = function() {
         baselineText = document.getElementById('liveTranscript').value.trim();
-        finalSpeech = "";
       };
 
       recognition.onresult = function(event) {
-        let interimSpeech = "";
+        let currentSessionSpeech = "";
 
+        // Collect the entire raw output for this active microphone burst
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalSpeech += event.results[i][0].transcript + " ";
-          } else {
-            interimSpeech += event.results[i][0].transcript + " ";
-          }
+           currentSessionSpeech += event.results[i][0].transcript + " ";
         }
         
-        let combinedSpeech = finalSpeech + interimSpeech;
-        let cleanedSpeech = cleanLiveTranscript(combinedSpeech);
-        
-        let spokenTokens = combinedSpeech.toLowerCase().replace(/[.,?!]/g, '').trim().split(/\s+/);
+        // LIVE CHEAT PREVENTION
+        let spokenTokens = currentSessionSpeech.toLowerCase().replace(/[.,?!]/g, '').trim().split(/\s+/);
         if (currentWord.length > 4 && spokenTokens.includes(currentWord.toLowerCase())) {
              document.getElementById('liveTranscript').value = baselineText; 
              document.getElementById('status').innerText = "🚫 SPELL IT OUT!";
-             finalSpeech = ""; 
              return; 
         }
 
+        let cleanedSpeech = cleanLiveTranscript(currentSessionSpeech);
+
         if (cleanedSpeech) {
-           let newText = baselineText ? baselineText + " " + cleanedSpeech : cleanedSpeech;
-           document.getElementById('liveTranscript').value = newText.replace(/\s+/g, ' ').trim();
+           // Strip existing spaces from baseline, attach new letters, and mathematically space them
+           let rawCombined = baselineText.replace(/\s+/g, '') + cleanedSpeech;
+           let perfectlySpaced = rawCombined.split('').join(' ');
+           document.getElementById('liveTranscript').value = perfectlySpaced;
         } else {
            document.getElementById('liveTranscript').value = baselineText;
         }
         
-        if (interimSpeech.trim() !== "") {
-           document.getElementById('status').innerText = "🎤 Hearing: " + cleanLiveTranscript(interimSpeech);
-        } else {
-           document.getElementById('status').innerText = "🎤 Listening... (Tip: Say 'Letter Y')";
-        }
+        document.getElementById('status').innerText = "🎤 Hearing: " + cleanLiveTranscript(currentSessionSpeech).split('').join(' ');
       };
       
       recognition.onend = function() {
