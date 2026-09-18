@@ -25,9 +25,14 @@
     #gameArea { display: none; }
     
     /* Ninja Progress Track Styles */
-    #trackContainer { width: 100%; height: 10px; background: #bdc3c7; border-radius: 5px; position: relative; margin: 40px 0 30px 0; }
-    #ninjaSprite { position: absolute; left: 0%; top: -18px; font-size: 35px; transition: left 0.4s ease-out; z-index: 10; }
-    #dojoSprite { position: absolute; right: -5px; top: -18px; font-size: 35px; }
+    #scoreStats { font-size: 18px; font-weight: bold; color: #34495e; margin-bottom: 10px; background: #ecf0f1; padding: 10px; border-radius: 8px; border: 1px solid #bdc3c7;}
+    #scoreStats span { color: #e74c3c; font-size: 20px; }
+    #trackContainer { width: 100%; height: 12px; background: #bdc3c7; border-radius: 6px; position: relative; margin: 50px 0 40px 0; }
+    #trackFill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #e74c3c; border-radius: 6px; transition: width 0.4s ease-out; }
+    #ninjaSprite { position: absolute; left: 0%; top: -35px; transition: left 0.4s ease-out; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+    .ninja-icon { font-size: 35px; line-height: 1; }
+    #ninjaScoreBadge { font-size: 14px; font-weight: bold; background: white; color: #e74c3c; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; border: 2px solid #e74c3c; margin-top: 2px; }
+    #dojoSprite { position: absolute; right: -5px; top: -25px; font-size: 35px; }
   </style>
 </head>
 <body>
@@ -44,9 +49,19 @@
     <!-- Practice Screen -->
     <div id="gameArea">
       
+      <!-- Gamification Stats -->
+      <div id="scoreStats">
+        Points Needed to Win: <span id="pointsRemaining">0</span> <br>
+        <small style="color: #7f8c8d; font-size: 14px;">(Total Required: <span id="pointsTotal">0</span>)</small>
+      </div>
+
       <!-- Gamification Progress Track -->
       <div id="trackContainer">
-        <div id="ninjaSprite">🥷</div>
+        <div id="trackFill"></div>
+        <div id="ninjaSprite">
+          <div class="ninja-icon">🥷</div>
+          <div id="ninjaScoreBadge">0</div>
+        </div>
         <div id="dojoSprite">🏯</div>
       </div>
 
@@ -136,6 +151,7 @@
       // Setup Gamification Math
       score = 0;
       maxScore = activeWords.length * 2;
+      document.getElementById('pointsTotal').innerText = maxScore;
       updateNinjaTrack();
 
       document.getElementById('selectionArea').style.display = 'none';
@@ -147,6 +163,11 @@
       // Calculates percentage, maxing out around 90% so the ninja stops on the dojo
       let progress = (score / maxScore) * 90;
       document.getElementById('ninjaSprite').style.left = progress + "%";
+      document.getElementById('trackFill').style.width = progress + "%";
+      
+      // Update UI texts
+      document.getElementById('ninjaScoreBadge').innerText = score;
+      document.getElementById('pointsRemaining').innerText = Math.max(0, maxScore - score);
     }
 
     function nextWord() {
@@ -167,7 +188,7 @@
     }
 
     function showHint() {
-      // Only apply the hint penalty once per word, regardless of how many times they click it
+      // Only apply the hint penalty once per word
       if (!hintPenaltyApplied) {
         score = Math.max(0, score - 1);
         hintPenaltyApplied = true;
@@ -190,9 +211,13 @@
       clearTimeout(retryTimer);
       document.getElementById('hintDisplay').style.display = "none";
       document.getElementById('status').innerText = "Finding a sentence scroll...";
+      window.speechSynthesis.cancel();
 
       fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${currentWord}`)
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) throw new Error("Word not found in API");
+          return response.json();
+        })
         .then(data => {
           let example = "";
           try {
@@ -208,7 +233,6 @@
           } catch(e) {}
 
           document.getElementById('status').innerText = "Sensei says listen...";
-          window.speechSynthesis.cancel();
           
           let sentenceText = example 
             ? `${currentWord}. ${example}. ${currentWord}.` 
@@ -220,8 +244,7 @@
         })
         .catch(error => {
           document.getElementById('status').innerText = "Sensei says listen...";
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(`Spell ${currentWord}.`);
+          const utterance = new SpeechSynthesisUtterance(`I do not have a sentence for this one. Spell ${currentWord}.`);
           utterance.onend = () => setTimeout(listenForSpelling, 500);
           window.speechSynthesis.speak(utterance);
         });
@@ -344,10 +367,8 @@
         if (currentWordMistakes >= 2) {
           document.getElementById('hintBtn').style.display = "inline-block";
           document.getElementById('tryAgainBtn').style.display = "inline-block";
-          // We intentionally do NOT set the retry timer here. 
-          // The app waits for them to use the hint and manually click "Try Again".
+          // We intentionally do NOT set the retry timer here so they have time to use the hint
         } else {
-          // If it's only their first mistake, auto-restart as usual
           retryTimer = setTimeout(speakAndListen, 2500);
         }
       }
