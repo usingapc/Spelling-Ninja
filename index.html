@@ -111,14 +111,15 @@
 
       <div id="status">Sensei says listen...</div>
       
-      <input type="text" id="liveTranscript" placeholder="Say or type letters..." autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" onkeypress="if(event.key === 'Enter') checkAnswer()" oninput="syncManualTyping()">
+      <input type="text" id="liveTranscript" placeholder="Type letters..." autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" onkeypress="if(event.key === 'Enter') checkAnswer()" oninput="syncManualTyping()">
       
       <div id="hintDisplay"></div>
       
       <button onclick="checkAnswer()" class="btn-submit" id="submitBtn">Strike!</button>
       
       <div class="btn-row">
-        <button id="micToggleBtn" onclick="toggleMic()" class="btn-secondary" style="background-color: #27ae60;">🎤 Mic ON</button>
+        <!-- Default Mic OFF -->
+        <button id="micToggleBtn" onclick="toggleMic()" class="btn-secondary" style="background-color: #c0392b;">🔇 Mic OFF</button>
         <button onclick="repeatWord()" class="btn-secondary">🔊 Hear</button>
         <button onclick="useInSentence()" class="btn-secondary" style="background-color: #f39c12;">📖 Sentence</button>
         <button onclick="clearCurrentText()" class="btn-secondary" style="background-color: #95a5a6;">✖ Clear</button>
@@ -140,7 +141,7 @@
     
     let recognition;
     let isListening = false;
-    let micEnabled = true;
+    let micEnabled = false;
     
     let baselineText = "";
     
@@ -151,7 +152,6 @@
     let wordPenaltyApplied = false;
     let hintPenaltyApplied = false;
     
-    // Track combination streak
     let combo = 0;
 
     fetch(API_URL)
@@ -464,7 +464,6 @@
       } catch(err) {}
     }
     
-    // Epic Fireworks Animation Function
     function triggerWinCelebration() {
       var duration = 4000;
       var animationEnd = Date.now() + duration;
@@ -478,7 +477,6 @@
         }
 
         var particleCount = 50 * (timeLeft / duration);
-        // since particles fall down, start a bit higher than random
         confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random(), y: Math.random() - 0.2 } }));
       }, 250);
     }
@@ -493,10 +491,9 @@
 
       if (cleanedSpelling === currentWord.toLowerCase()) {
         score++;
-        combo++; // Increase the combo streak!
+        combo++; 
         updateNinjaTrack();
         
-        // Show combo on screen
         document.getElementById('comboDisplay').style.display = 'inline';
         document.getElementById('comboCount').innerText = combo;
         
@@ -504,32 +501,37 @@
           document.getElementById('status').innerText = "🏆 YOU REACHED THE DOJO! 🏆";
           document.getElementById('liveTranscript').value = "YOU WIN!";
           
-          triggerWinCelebration(); // Fire the confetti!
+          triggerWinCelebration(); 
           
           window.speechSynthesis.speak(new SpeechSynthesisUtterance("Congratulations! You have reached the Dojo and are a true Spelling Ninja!"));
           setTimeout(function() { location.reload(); }, 6000); 
         } else {
-          // Dynamic success phrases
           const successPhrases = ["Great job", "Well done", "Awesome job", "Perfect strike", "You nailed it"];
           let phrase = successPhrases[Math.floor(Math.random() * successPhrases.length)];
           
           document.getElementById('status').innerText = "✅ " + phrase + "!";
           
-          // Build what the Sensei says out loud
           let verbalPhrase = phrase;
           if (combo > 1) {
              verbalPhrase += ". That is " + combo + " spelled right in a row!";
           }
           
-          window.speechSynthesis.speak(new SpeechSynthesisUtterance(verbalPhrase));
+          // Use onend instead of a hardcoded timer so it never gets cut off
+          let successUtterance = new SpeechSynthesisUtterance(verbalPhrase);
           
-          // Wait slightly longer so the longer phrase finishes playing
-          setTimeout(nextWord, 2500); 
+          // Prevents garbage collection bug on Android Chrome
+          window.currentUtterance = successUtterance;
+          
+          successUtterance.onend = () => {
+             setTimeout(nextWord, 500); // Small half-second pause before next word
+          };
+          
+          window.speechSynthesis.speak(successUtterance);
         }
       } else {
         currentWordMistakes++;
         
-        combo = 0; // Reset combination to zero
+        combo = 0; 
         document.getElementById('comboDisplay').style.display = 'none';
         
         if (!wordPenaltyApplied) {
@@ -538,12 +540,14 @@
           updateNinjaTrack();
         }
         
-        // Dynamic failure phrases
         const failPhrases = ["No! That's not right", "Better luck next time", "Sorry, but that is incorrect", "Try again, but be extra careful", "Not quite right"];
         let failPhrase = failPhrases[Math.floor(Math.random() * failPhrases.length)];
         
         document.getElementById('status').innerText = `❌ ${failPhrase}! You spelled: ${cleanedSpelling.split('').join(' ').toUpperCase()}`;
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(failPhrase));
+        
+        let failUtterance = new SpeechSynthesisUtterance(failPhrase);
+        window.currentUtterance = failUtterance;
+        window.speechSynthesis.speak(failUtterance);
         
         if (currentWordMistakes >= 2) {
           document.getElementById('hintBtn').style.display = "inline-block";
