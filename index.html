@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Spelling Ninja</title>
+  
+  <!-- This line adds the Ninja emoji as the browser tab icon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥷</text></svg>">
+  
   <style>
     body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; background-color: #2c3e50; color: #333; margin: 0; }
     .card { background: white; width: 100%; max-width: 500px; margin: 0 auto; padding: 20px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.5); border-top: 5px solid #e74c3c; box-sizing: border-box; }
@@ -157,7 +161,9 @@
     function renderListOptions() {
       const container = document.getElementById('listCheckboxes');
       container.innerHTML = "";
-      const titles = Object.keys(allLists);
+      
+      // REVERSE THE ARRAY: This makes the farthest right columns (newest) appear at the top!
+      const titles = Object.keys(allLists).reverse();
       
       if (titles.length === 0) {
         container.innerText = "No word lists found.";
@@ -391,7 +397,6 @@
         cleanedText = cleanedText.replace(regex, right);
       }
 
-      // Strips ALL spaces out completely so we can physically force single-spacing later
       return cleanedText.toUpperCase().replace(/\s+/g, '').trim();
     }
 
@@ -415,12 +420,10 @@
       recognition.onresult = function(event) {
         let currentSessionSpeech = "";
 
-        // Collect the entire raw output for this active microphone burst
         for (let i = event.resultIndex; i < event.results.length; ++i) {
            currentSessionSpeech += event.results[i][0].transcript + " ";
         }
         
-        // LIVE CHEAT PREVENTION
         let spokenTokens = currentSessionSpeech.toLowerCase().replace(/[.,?!]/g, '').trim().split(/\s+/);
         if (currentWord.length > 4 && spokenTokens.includes(currentWord.toLowerCase())) {
              document.getElementById('liveTranscript').value = baselineText; 
@@ -431,7 +434,6 @@
         let cleanedSpeech = cleanLiveTranscript(currentSessionSpeech);
 
         if (cleanedSpeech) {
-           // Strip existing spaces from baseline, attach new letters, and mathematically space them
            let rawCombined = baselineText.replace(/\s+/g, '') + cleanedSpeech;
            let perfectlySpaced = rawCombined.split('').join(' ');
            document.getElementById('liveTranscript').value = perfectlySpaced;
