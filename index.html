@@ -65,6 +65,13 @@
     #ninjaScoreBadge { font-size: 12px; font-weight: bold; background: white; color: #e74c3c; border-radius: 50%; width: 18px; height: 18px; line-height: 18px; text-align: center; border: 2px solid #e74c3c; margin-top: 2px; }
     #dojoSprite { position: absolute; right: -5px; top: -16px; font-size: 26px; }
 
+    /* Victory Screen Styles */
+    #victoryScreen { display: none; margin-top: 20px; animation: fadeIn 1s; }
+    .struggle-board { background: #fdfbf7; border: 2px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: left; }
+    .struggle-item { font-size: 18px; margin: 8px 0; border-bottom: 1px dashed #bdc3c7; padding-bottom: 5px; display: flex; justify-content: space-between; }
+    .miss-count { color: #e74c3c; font-weight: bold; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
     @media (max-width: 600px) {
       body { background-color: white; padding: 0; }
       .card { border-radius: 0; box-shadow: none; border-top-width: 5px; padding: 10px; min-height: 100vh; display: block; }
@@ -111,23 +118,39 @@
 
       <div id="status">Sensei says listen...</div>
       
-      <input type="text" id="liveTranscript" placeholder="Type letters..." autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" onkeypress="if(event.key === 'Enter') checkAnswer()" oninput="syncManualTyping()">
-      
-      <div id="hintDisplay"></div>
-      
-      <button onclick="checkAnswer()" class="btn-submit" id="submitBtn">Strike!</button>
-      
-      <div class="btn-row">
-        <!-- Default Mic OFF -->
-        <button id="micToggleBtn" onclick="toggleMic()" class="btn-secondary" style="background-color: #c0392b;">🔇 Mic OFF</button>
-        <button onclick="repeatWord()" class="btn-secondary">🔊 Hear</button>
-        <button onclick="useInSentence()" class="btn-secondary" style="background-color: #f39c12;">📖 Sentence</button>
-        <button onclick="clearCurrentText()" class="btn-secondary" style="background-color: #95a5a6;">✖ Clear</button>
+      <!-- Interactive Elements Container (Hidden on win) -->
+      <div id="interactiveControls">
+        <input type="text" id="liveTranscript" placeholder="Type letters..." autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" onkeypress="if(event.key === 'Enter') checkAnswer()" oninput="syncManualTyping()">
+        
+        <div id="hintDisplay"></div>
+        
+        <button onclick="checkAnswer()" class="btn-submit" id="submitBtn">Strike!</button>
+        
+        <div class="btn-row">
+          <button id="micToggleBtn" onclick="toggleMic()" class="btn-secondary" style="background-color: #c0392b;">🔇 Mic OFF</button>
+          <button onclick="repeatWord()" class="btn-secondary">🔊 Hear</button>
+          <button onclick="useInSentence()" class="btn-secondary" style="background-color: #f39c12;">📖 Sentence</button>
+          <button onclick="clearCurrentText()" class="btn-secondary" style="background-color: #95a5a6;">✖ Clear</button>
+        </div>
+        <div class="btn-row">
+          <button id="hintBtn" onclick="showHint()" class="btn-secondary" style="background-color: #8e44ad; display: none;">💡 Hint</button>
+          <button id="tryAgainBtn" onclick="tryAgainManual()" class="btn-secondary" style="background-color: #3498db; display: none;">🔄 Try Again</button>
+        </div>
       </div>
-      <div class="btn-row">
-        <button id="hintBtn" onclick="showHint()" class="btn-secondary" style="background-color: #8e44ad; display: none;">💡 Hint</button>
-        <button id="tryAgainBtn" onclick="tryAgainManual()" class="btn-secondary" style="background-color: #3498db; display: none;">🔄 Try Again</button>
+      
+      <!-- Persistent Victory Screen -->
+      <div id="victoryScreen">
+        <h2 style="color: #27ae60; margin: 10px 0;">🎉 Dojo Master! 🎉</h2>
+        <p style="font-size: 16px; margin: 0; color: #7f8c8d;">You are a true Spelling Ninja.</p>
+        
+        <div class="struggle-board" id="struggleBoard">
+          <h3 style="margin-top: 0; color: #2c3e50; text-align: center;">📜 Ninja Practice Scroll</h3>
+          <div id="struggleList"></div>
+        </div>
+        
+        <button class="btn-submit" onclick="location.reload()" style="background-color: #3498db; margin-top: 25px;">Return to Menu</button>
       </div>
+
     </div>
   </div>
 
@@ -153,6 +176,7 @@
     let hintPenaltyApplied = false;
     
     let combo = 0;
+    let wordMistakeTracker = {}; // Tracks overall misspellings per word for the final report
 
     fetch(API_URL)
       .then(response => response.json())
@@ -209,6 +233,7 @@
       remainingDeck = []; 
       score = 0;
       combo = 0;
+      wordMistakeTracker = {}; // Reset tracking
       maxScore = activeWords.length * 2;
       document.getElementById('pointsTotal').innerText = maxScore;
       updateNinjaTrack();
@@ -465,20 +490,55 @@
     }
     
     function triggerWinCelebration() {
-      var duration = 4000;
+      // 10 Second Epic Double-Cannon Confetti 
+      var duration = 10000;
       var animationEnd = Date.now() + duration;
       var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
 
+      function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
       var interval = setInterval(function() {
         var timeLeft = animationEnd - Date.now();
-
         if (timeLeft <= 0) {
           return clearInterval(interval);
         }
 
         var particleCount = 50 * (timeLeft / duration);
-        confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random(), y: Math.random() - 0.2 } }));
+        // Shoot from left edge
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+        // Shoot from right edge
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
       }, 250);
+    }
+    
+    function displayVictoryScreen() {
+      // Hide interactive elements
+      document.getElementById('interactiveControls').style.display = 'none';
+      document.getElementById('status').style.display = 'none';
+      
+      // Calculate top 5 struggled words
+      const container = document.getElementById('struggleList');
+      container.innerHTML = "";
+      
+      let missedWords = Object.entries(wordMistakeTracker)
+          .filter(([word, count]) => count > 0)
+          .sort((a, b) => b[1] - a[1]) // Sort by highest count
+          .slice(0, 5); // Take top 5
+          
+      if (missedWords.length > 0) {
+        missedWords.forEach(([word, count]) => {
+          let div = document.createElement('div');
+          div.className = 'struggle-item';
+          div.innerHTML = `<span>${word.toUpperCase()}</span> <span class="miss-count">Missed ${count}x</span>`;
+          container.appendChild(div);
+        });
+      } else {
+        container.innerHTML = `<div style="text-align:center; padding: 10px; font-weight:bold; color:#27ae60;">✨ Flawless Victory! No words missed! ✨</div>`;
+      }
+      
+      document.getElementById('victoryScreen').style.display = 'block';
     }
 
     function checkAnswer() {
@@ -502,34 +562,53 @@
           document.getElementById('liveTranscript').value = "YOU WIN!";
           
           triggerWinCelebration(); 
+          displayVictoryScreen();
           
           window.speechSynthesis.speak(new SpeechSynthesisUtterance("Congratulations! You have reached the Dojo and are a true Spelling Ninja!"));
-          setTimeout(function() { location.reload(); }, 6000); 
+          // Removed the auto-reload timeout so the screen stays up forever
         } else {
-          const successPhrases = ["Great job", "Well done", "Awesome job", "Perfect strike", "You nailed it"];
+          const successPhrases = ["Great job", "Well done", "Awesome job", "Perfect strike", "You nailed it", "Ninja skills activated"];
           let phrase = successPhrases[Math.floor(Math.random() * successPhrases.length)];
           
-          document.getElementById('status').innerText = "✅ " + phrase + "!";
-          
           let verbalPhrase = phrase;
+          let textPhrase = "✅ " + phrase + "!";
+          
           if (combo > 1) {
-             verbalPhrase += ". That is " + combo + " spelled right in a row!";
+             const adjectives = ["flying", "spinning", "shadow", "tornado", "lightning", "dragon", "stealth", "epic"];
+             const moves = ["chop", "kick", "block", "flip", "dash", "roundhouse", "strike", "sweep"];
+             
+             let randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+             let randomMove = moves[Math.floor(Math.random() * moves.length)];
+             
+             const comboPhrases = [
+               ` That's a ${combo}-hit ${randomAdj} ${randomMove}!`,
+               ` You unleashed a ${combo}-move ${randomAdj} combo!`,
+               ` A perfect ${combo}-strike ${randomAdj} ${randomMove}!`,
+               ` Feel the power of the ${combo}-hit ${randomAdj} ${randomMove}!`
+             ];
+             
+             let chosenComboPhrase = comboPhrases[Math.floor(Math.random() * comboPhrases.length)];
+             
+             verbalPhrase += "." + chosenComboPhrase;
+             textPhrase += chosenComboPhrase; 
           }
           
-          // Use onend instead of a hardcoded timer so it never gets cut off
-          let successUtterance = new SpeechSynthesisUtterance(verbalPhrase);
+          document.getElementById('status').innerText = textPhrase;
           
-          // Prevents garbage collection bug on Android Chrome
+          let successUtterance = new SpeechSynthesisUtterance(verbalPhrase);
           window.currentUtterance = successUtterance;
           
           successUtterance.onend = () => {
-             setTimeout(nextWord, 500); // Small half-second pause before next word
+             setTimeout(nextWord, 500); 
           };
           
           window.speechSynthesis.speak(successUtterance);
         }
       } else {
         currentWordMistakes++;
+        
+        // Track global mistakes for the end-screen report
+        wordMistakeTracker[currentWord] = (wordMistakeTracker[currentWord] || 0) + 1;
         
         combo = 0; 
         document.getElementById('comboDisplay').style.display = 'none';
