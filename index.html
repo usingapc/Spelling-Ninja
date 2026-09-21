@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Spelling Ninja</title>
   
-  <!-- This line adds the Ninja emoji as the browser tab icon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥷</text></svg>">
+  
+  <!-- Canvas Confetti Library for the Win Celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   
   <style>
     body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 10px; background-color: #2c3e50; color: #333; margin: 0; }
@@ -54,6 +56,7 @@
     
     #scoreStats { font-size: 15px; font-weight: bold; color: #34495e; margin-bottom: 10px; background: #ecf0f1; padding: 6px; border-radius: 8px; border: 1px solid #bdc3c7;}
     #scoreStats span { color: #e74c3c; font-size: 16px; }
+    #comboDisplay { color: #e67e22; margin-left: 10px; display: none; }
     
     #trackContainer { width: 100%; height: 10px; background: #bdc3c7; border-radius: 6px; position: relative; margin: 25px 0 15px 0; }
     #trackFill { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #e74c3c; border-radius: 6px; transition: width 0.4s ease-out; }
@@ -94,6 +97,7 @@
       <div id="scoreStats">
         Points Needed: <span id="pointsRemaining">0</span> 
         <small style="color: #7f8c8d; font-weight: normal; margin-left: 8px;">(Total: <span id="pointsTotal">0</span>)</small>
+        <span id="comboDisplay">🔥 Combo: <span id="comboCount">0</span></span>
       </div>
 
       <div id="trackContainer">
@@ -146,6 +150,9 @@
     let currentWordMistakes = 0;
     let wordPenaltyApplied = false;
     let hintPenaltyApplied = false;
+    
+    // Track combination streak
+    let combo = 0;
 
     fetch(API_URL)
       .then(response => response.json())
@@ -162,7 +169,6 @@
       const container = document.getElementById('listCheckboxes');
       container.innerHTML = "";
       
-      // REVERSE THE ARRAY: This makes the farthest right columns (newest) appear at the top!
       const titles = Object.keys(allLists).reverse();
       
       if (titles.length === 0) {
@@ -202,6 +208,7 @@
 
       remainingDeck = []; 
       score = 0;
+      combo = 0;
       maxScore = activeWords.length * 2;
       document.getElementById('pointsTotal').innerText = maxScore;
       updateNinjaTrack();
@@ -456,6 +463,25 @@
         recognition.start();
       } catch(err) {}
     }
+    
+    // Epic Fireworks Animation Function
+    function triggerWinCelebration() {
+      var duration = 4000;
+      var animationEnd = Date.now() + duration;
+      var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+      var interval = setInterval(function() {
+        var timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        var particleCount = 50 * (timeLeft / duration);
+        // since particles fall down, start a bit higher than random
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: Math.random(), y: Math.random() - 0.2 } }));
+      }, 250);
+    }
 
     function checkAnswer() {
       isListening = false;
@@ -467,20 +493,44 @@
 
       if (cleanedSpelling === currentWord.toLowerCase()) {
         score++;
+        combo++; // Increase the combo streak!
         updateNinjaTrack();
         
+        // Show combo on screen
+        document.getElementById('comboDisplay').style.display = 'inline';
+        document.getElementById('comboCount').innerText = combo;
+        
         if (score >= maxScore) {
-          document.getElementById('status').innerText = "🏆 You reached the Dojo! 🏆";
+          document.getElementById('status').innerText = "🏆 YOU REACHED THE DOJO! 🏆";
           document.getElementById('liveTranscript').value = "YOU WIN!";
-          window.speechSynthesis.speak(new SpeechSynthesisUtterance("Congratulations! You won!"));
-          setTimeout(function() { location.reload(); }, 4000); 
+          
+          triggerWinCelebration(); // Fire the confetti!
+          
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance("Congratulations! You have reached the Dojo and are a true Spelling Ninja!"));
+          setTimeout(function() { location.reload(); }, 6000); 
         } else {
-          document.getElementById('status').innerText = "✅ Perfect Strike!";
-          window.speechSynthesis.speak(new SpeechSynthesisUtterance("Perfect!"));
-          setTimeout(nextWord, 1500);
+          // Dynamic success phrases
+          const successPhrases = ["Great job", "Well done", "Awesome job", "Perfect strike", "You nailed it"];
+          let phrase = successPhrases[Math.floor(Math.random() * successPhrases.length)];
+          
+          document.getElementById('status').innerText = "✅ " + phrase + "!";
+          
+          // Build what the Sensei says out loud
+          let verbalPhrase = phrase;
+          if (combo > 1) {
+             verbalPhrase += ". That is " + combo + " spelled right in a row!";
+          }
+          
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(verbalPhrase));
+          
+          // Wait slightly longer so the longer phrase finishes playing
+          setTimeout(nextWord, 2500); 
         }
       } else {
         currentWordMistakes++;
+        
+        combo = 0; // Reset combination to zero
+        document.getElementById('comboDisplay').style.display = 'none';
         
         if (!wordPenaltyApplied) {
           score = Math.max(0, score - 1);
@@ -488,14 +538,18 @@
           updateNinjaTrack();
         }
         
-        document.getElementById('status').innerText = `❌ Missed! You spelled: ${cleanedSpelling}`;
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("Try again."));
+        // Dynamic failure phrases
+        const failPhrases = ["No! That's not right", "Better luck next time", "Sorry, but that is incorrect", "Try again, but be extra careful", "Not quite right"];
+        let failPhrase = failPhrases[Math.floor(Math.random() * failPhrases.length)];
+        
+        document.getElementById('status').innerText = `❌ ${failPhrase}! You spelled: ${cleanedSpelling.split('').join(' ').toUpperCase()}`;
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(failPhrase));
         
         if (currentWordMistakes >= 2) {
           document.getElementById('hintBtn').style.display = "inline-block";
           document.getElementById('tryAgainBtn').style.display = "inline-block";
         } else {
-          retryTimer = setTimeout(speakAndListen, 2500);
+          retryTimer = setTimeout(speakAndListen, 3000);
         }
       }
     }
