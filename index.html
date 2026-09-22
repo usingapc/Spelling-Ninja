@@ -7,7 +7,6 @@
   
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥷</text></svg>">
   
-  <!-- Canvas Confetti Library for the Win Celebration -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   
   <style>
@@ -65,7 +64,6 @@
     #ninjaScoreBadge { font-size: 12px; font-weight: bold; background: white; color: #e74c3c; border-radius: 50%; width: 18px; height: 18px; line-height: 18px; text-align: center; border: 2px solid #e74c3c; margin-top: 2px; }
     #dojoSprite { position: absolute; right: -5px; top: -16px; font-size: 26px; }
 
-    /* Victory Screen Styles */
     #victoryScreen { display: none; margin-top: 20px; animation: fadeIn 1s; }
     .struggle-board { background: #fdfbf7; border: 2px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: left; }
     .struggle-item { font-size: 18px; margin: 8px 0; border-bottom: 1px dashed #bdc3c7; padding-bottom: 5px; display: flex; justify-content: space-between; }
@@ -118,7 +116,6 @@
 
       <div id="status">Sensei says listen...</div>
       
-      <!-- Interactive Elements Container (Hidden on win) -->
       <div id="interactiveControls">
         <input type="text" id="liveTranscript" placeholder="Type letters..." autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" onkeypress="if(event.key === 'Enter') checkAnswer()" oninput="syncManualTyping()">
         
@@ -138,7 +135,6 @@
         </div>
       </div>
       
-      <!-- Persistent Victory Screen -->
       <div id="victoryScreen">
         <h2 style="color: #27ae60; margin: 10px 0;">🎉 Dojo Master! 🎉</h2>
         <p style="font-size: 16px; margin: 0; color: #7f8c8d;">You are a true Spelling Ninja.</p>
@@ -172,11 +168,10 @@
     let score = 0;
     let maxScore = 1;
     let currentWordMistakes = 0;
-    let wordPenaltyApplied = false;
-    let hintPenaltyApplied = false;
+    let wordReaddedThisTurn = false;
     
     let combo = 0;
-    let wordMistakeTracker = {}; // Tracks overall misspellings per word for the final report
+    let wordMistakeTracker = {}; 
 
     fetch(API_URL)
       .then(response => response.json())
@@ -230,16 +225,17 @@
 
       if (activeWords.length === 0) return alert("Select at least one training scroll.");
 
-      remainingDeck = []; 
+      remainingDeck = [...activeWords];
+      shuffleArray(remainingDeck);
+      
       score = 0;
       combo = 0;
-      wordMistakeTracker = {}; // Reset tracking
-      maxScore = activeWords.length * 2;
-      document.getElementById('pointsTotal').innerText = maxScore;
-      updateNinjaTrack();
-
+      wordMistakeTracker = {}; 
+      maxScore = activeWords.length; 
+      
       document.getElementById('selectionArea').style.display = 'none';
       document.getElementById('gameArea').style.display = 'block';
+      updateNinjaTrack();
       nextWord();
     }
     
@@ -250,6 +246,7 @@
       
       document.getElementById('ninjaScoreBadge').innerText = score;
       document.getElementById('pointsRemaining').innerText = Math.max(0, maxScore - score);
+      document.getElementById('pointsTotal').innerText = maxScore;
     }
     
     function toggleMic() {
@@ -275,23 +272,11 @@
 
     function nextWord() {
       currentWordMistakes = 0;
-      wordPenaltyApplied = false;
-      hintPenaltyApplied = false;
+      wordReaddedThisTurn = false;
       document.getElementById('hintBtn').style.display = "none";
       document.getElementById('tryAgainBtn').style.display = "none";
       document.getElementById('hintDisplay').style.display = "none";
       document.getElementById('submitBtn').style.display = "block"; 
-
-      if (remainingDeck.length === 0) {
-        remainingDeck = [...activeWords];
-        shuffleArray(remainingDeck);
-        
-        if (remainingDeck.length > 1 && remainingDeck[0] === currentWord) {
-          let temp = remainingDeck[0];
-          remainingDeck[0] = remainingDeck[1];
-          remainingDeck[1] = temp;
-        }
-      }
 
       currentWord = remainingDeck.shift();
       speakAndListen();
@@ -302,11 +287,7 @@
     }
 
     function showHint() {
-      if (!hintPenaltyApplied) {
-        score = Math.max(0, score - 1);
-        hintPenaltyApplied = true;
-        updateNinjaTrack();
-      }
+      // Hint no longer deducts points or applies penalties
       document.getElementById('hintDisplay').innerText = currentWord.toUpperCase();
       document.getElementById('hintDisplay').style.display = "block";
       document.getElementById('submitBtn').style.display = "none"; 
@@ -490,7 +471,6 @@
     }
     
     function triggerWinCelebration() {
-      // 10 Second Epic Double-Cannon Confetti 
       var duration = 10000;
       var animationEnd = Date.now() + duration;
       var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
@@ -506,26 +486,22 @@
         }
 
         var particleCount = 50 * (timeLeft / duration);
-        // Shoot from left edge
         confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
-        // Shoot from right edge
         confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
       }, 250);
     }
     
     function displayVictoryScreen() {
-      // Hide interactive elements
       document.getElementById('interactiveControls').style.display = 'none';
       document.getElementById('status').style.display = 'none';
       
-      // Calculate top 5 struggled words
       const container = document.getElementById('struggleList');
       container.innerHTML = "";
       
       let missedWords = Object.entries(wordMistakeTracker)
           .filter(([word, count]) => count > 0)
-          .sort((a, b) => b[1] - a[1]) // Sort by highest count
-          .slice(0, 5); // Take top 5
+          .sort((a, b) => b[1] - a[1]) 
+          .slice(0, 5); 
           
       if (missedWords.length > 0) {
         missedWords.forEach(([word, count]) => {
@@ -565,7 +541,6 @@
           displayVictoryScreen();
           
           window.speechSynthesis.speak(new SpeechSynthesisUtterance("Congratulations! You have reached the Dojo and are a true Spelling Ninja!"));
-          // Removed the auto-reload timeout so the screen stays up forever
         } else {
           const successPhrases = ["Great job", "Well done", "Awesome job", "Perfect strike", "You nailed it", "Ninja skills activated"];
           let phrase = successPhrases[Math.floor(Math.random() * successPhrases.length)];
@@ -606,16 +581,19 @@
         }
       } else {
         currentWordMistakes++;
-        
-        // Track global mistakes for the end-screen report
         wordMistakeTracker[currentWord] = (wordMistakeTracker[currentWord] || 0) + 1;
         
         combo = 0; 
         document.getElementById('comboDisplay').style.display = 'none';
         
-        if (!wordPenaltyApplied) {
-          score = Math.max(0, score - 1);
-          wordPenaltyApplied = true;
+        // Re-add word logic: No score penalty, maxScore increments, word reshuffled back into deck
+        if (!wordReaddedThisTurn) {
+          wordReaddedThisTurn = true;
+          maxScore++; 
+          
+          const insertIndex = Math.floor(Math.random() * (remainingDeck.length + 1));
+          remainingDeck.splice(insertIndex, 0, currentWord);
+          
           updateNinjaTrack();
         }
         
